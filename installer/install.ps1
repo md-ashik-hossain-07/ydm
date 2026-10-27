@@ -21,7 +21,7 @@ The release version tag to install (e.g. 'v1.0.0'). Defaults to 'latest'.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory=$false, Position=0)]
-    [string]$Repository,
+    [string]$Repository = "md-ashik-hossain-07/ydm",
 
     [Parameter(Mandatory=$false, Position=1)]
     [string]$Version = "latest"
@@ -36,15 +36,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 
 # 1. Validate repository argument
 if ([string]::IsNullOrWhiteSpace($Repository)) {
-    Write-Error @"
-Repository parameter is required.
-Usage:
-    .\install.ps1 -Repository '<owner>/<repo>' [-Version '<tag>']
-
-Example:
-    .\install.ps1 -Repository 'your-org/ydm' -Version 'latest'
-"@
-    exit 1
+    $Repository = "md-ashik-hossain-07/ydm"
 }
 
 # 2. Query GitHub release endpoint

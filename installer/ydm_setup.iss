@@ -3,6 +3,7 @@
 #define MyAppFullName "Your Download Manager"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "YDM Open Source Contributors"
+#define MyAppURL "https://github.com/md-ashik-hossain-07/ydm"
 #define MyAppExeName "YDM.UI.exe"
 
 [Setup]
@@ -10,6 +11,9 @@ AppId={{5A1D2B9F-83C4-4B2E-9D11-47E53B02C481}
 AppName={#MyAppFullName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
+AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppURL}
+AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppFullName}
 DisableProgramGroupPage=yes

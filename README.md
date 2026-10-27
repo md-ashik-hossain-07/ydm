@@ -2,7 +2,7 @@
 
 > **Your Downloads. Your Control.**
 
-[![Build & Test](https://github.com/placeholder-owner/ydm/actions/workflows/build-and-test.yml/badge.svg)](#build-and-test)
+[![Build & Test](https://github.com/md-ashik-hossain-07/ydm/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/md-ashik-hossain-07/ydm/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Windows 10/11](https://img.shields.io/badge/Platform-Windows%2010%2F11%20x64-brightgreen.svg)](#system-requirements)
 [![Target Framework: .NET 8.0](https://img.shields.io/badge/.NET-8.0%20LTS-purple.svg)](#building-from-source)
@@ -52,26 +52,34 @@
 
 ## 3. Installation Methods
 
+> [!NOTE]
+> **Windows SmartScreen Notice:**
+> Because open-source release binaries are distributed without an expensive proprietary EV code-signing certificate, Windows SmartScreen will display an informational banner (*"Windows protected your PC"*). To proceed: click **More info** -> **Run anyway**.
+
 ### Option A: Windows Setup Installer (Recommended)
-1. Download `ydm_setup_1.0.0_win-x64.exe` from the latest release on your GitHub repository.
+1. Download `ydm_setup_1.0.0_win-x64.exe` from the [Latest GitHub Release](https://github.com/md-ashik-hossain-07/ydm/releases/latest).
 2. Run the installer wizard:
-   - Configures application files in `%LOCALAPPDATA%\Programs\YDM` (or `Program Files`).
+   - Installs to `%LOCALAPPDATA%\Programs\YDM` without requiring administrator or UAC elevation.
    - Automatically registers the Chromium Native Messaging bridge for Chrome and Edge in the Windows Registry (`HKCU`).
    - Optionally creates Desktop and Startup shortcuts.
-3. *Windows SmartScreen Note:* Because official releases are distributed unsigned, Windows SmartScreen will display an informational banner (*"Windows protected your PC"*). Click **More info** -> **Run anyway**.
+3. Launch YDM from your Start Menu.
 
 ### Option B: PowerShell Fast Install
-To download, verify SHA-256 integrity, and launch the installer via PowerShell:
+To download, verify SHA-256 integrity, and launch the installer via PowerShell in one command:
 ```powershell
-# Replace '<owner>/<repo>' with the official repository (e.g. 'your-username/ydm')
-.\installer\install.ps1 -Repository '<owner>/<repo>'
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/md-ashik-hossain-07/ydm/main/installer/install.ps1 | iex"
+```
+Or when running from a cloned workspace:
+```powershell
+.\installer\install.ps1 -Repository 'md-ashik-hossain-07/ydm'
 ```
 > **Security Guarantee:** The script downloads the official release `checksums.txt` manifest over HTTPS, verifies the SHA-256 hash of the downloaded installer, and will abort immediately if the checksum does not match.
 
 ### Option C: Portable Application (Zero-Install)
-1. Download `ydm-v1.0.0-win-x64-portable.zip` from releases.
-2. Extract the archive to any folder.
+1. Download `ydm-v1.0.0-win-x64-portable.zip` from [Releases](https://github.com/md-ashik-hossain-07/ydm/releases/latest).
+2. Extract the archive to any folder of your choice.
 3. Launch `YDM.UI.exe`.
+4. *(Optional)* Run `powershell -ExecutionPolicy Bypass -File register_host.ps1` in the extracted folder to enable Chrome and Edge browser integration.
 
 ---
 
