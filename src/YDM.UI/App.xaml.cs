@@ -13,6 +13,7 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         try
         {
@@ -31,6 +32,8 @@ public partial class App : Application
             var mainViewModel = new MainViewModel(engine, downloadRepository, queueManager, settingsRepository);
             var mainWindow = new MainWindow(mainViewModel, settingsRepository);
 
+            MainWindow = mainWindow;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
         }
         catch (Exception ex)
