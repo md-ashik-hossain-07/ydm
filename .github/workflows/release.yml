@@ -22,32 +22,56 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    - name: Install Inno Setup
+      shell: pwsh
+      run: |
+        choco install innosetup --no-progress
+        if (Test-Path "C:\Program Files (x86)\Inno Setup 6") {
+          "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+        }
+        if (Test-Path "C:\Program Files\Inno Setup 6") {
+          "C:\Program Files\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+        }
+
     - name: Restore Dependencies
       run: dotnet restore YDM.sln
 
     - name: Run Test Suite
       run: dotnet test tests/YDM.Tests/YDM.Tests.csproj --configuration Release --verbosity normal
 
-    - name: Publish Self-Contained Desktop App
+    - name: Publish Self-Contained Desktop App & Host
       run: |
         dotnet publish src/YDM.UI/YDM.UI.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/ui
         dotnet publish src/YDM.Host/YDM.Host.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish/host
 
+    - name: Prepare Combined Publish Payload
+      shell: pwsh
+      run: |
+        Copy-Item -Path publish/host/YDM.Host.exe -Destination publish/ui/ -Force
+        Copy-Item -Path host/com.ydm.downloader.json -Destination publish/ui/ -Force
+        Copy-Item -Path host/register_host.ps1 -Destination publish/ui/ -Force
+        Copy-Item -Path host/unregister_host.ps1 -Destination publish/ui/ -Force
+        Remove-Item -Path publish/ui/*.pdb -Force -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Path dist -Force | Out-Null
+
+    - name: Build Windows Installer (Inno Setup)
+      shell: pwsh
+      run: |
+        & iscc.exe "installer/ydm_setup.iss"
+
     - name: Package Portable ZIP
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Path dist -Force | Out-Null
-        Copy-Item -Path publish/host/YDM.Host.exe -Destination publish/ui/
-        Copy-Item -Path host/com.ydm.downloader.json -Destination publish/ui/
-        Compress-Archive -Path publish/ui/* -DestinationPath dist/ydm-${{ github.ref_name }}-win-x64-portable.zip
+        Compress-Archive -Path publish/ui/* -DestinationPath "dist/ydm-${{ github.ref_name }}-win-x64-portable.zip"
 
-    - name: Generate Checksums
+    - name: Generate SHA-256 Checksums
       shell: pwsh
       run: |
-        Get-ChildItem -Path dist/* | ForEach-Object {
+        Get-ChildItem -Path dist/* -Include *.exe, *.zip | ForEach-Object {
           $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($_.Name)" | Out-File -FilePath dist/checksums.txt -Append -Encoding UTF8
         }
+        Get-Content dist/checksums.txt
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
