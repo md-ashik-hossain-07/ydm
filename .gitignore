@@ -1,0 +1,37 @@
+## Build and Output Folders
+bin/
+obj/
+dist/
+publish/
+*.user
+*.userosscache
+*.sln.docstates
+
+## Visual Studio & Rider
+.vs/
+.idea/
+*.suo
+*.userprefs
+*.launchSettings.json
+
+## Test Results and Artifacts
+TestResults/
+*.trx
+*.coverage
+*.lcov
+
+## Temporary and Cache Files
+*.tmp
+*.log
+*.sqlite-wal
+*.sqlite-shm
+ydm.db
+ydm.db-wal
+ydm.db-shm
+
+## OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

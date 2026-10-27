@@ -1,0 +1,33 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build & Run Test Suite
+    runs-on: windows-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8.0 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore YDM.sln
+
+    - name: Build Solution
+      run: dotnet build YDM.sln --configuration Release --no-restore
+
+    - name: Run Automated Tests
+      run: dotnet test tests/YDM.Tests/YDM.Tests.csproj --configuration Release --no-build --verbosity normal

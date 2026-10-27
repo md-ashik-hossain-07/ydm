@@ -1,0 +1,254 @@
+<Window x:Class="YDM.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:YDM.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="YDM — Your Download Manager" 
+        Height="650" Width="1050"
+        MinHeight="450" MinWidth="750"
+        WindowStartupLocation="CenterScreen"
+        Background="#F3F3F3"
+        FontFamily="Segoe UI">
+    
+    <Window.Resources>
+        <!-- Modern Button Style -->
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#222222"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E5E5E5"/>
+                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="AccentToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+            <Setter Property="Background" Value="#0067C0"/>
+            <Setter Property="BorderBrush" Value="#005A9E"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#005A9E"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Category Nav Button Style -->
+        <Style x:Key="CategoryButtonStyle" TargetType="Button">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Margin" Value="4,2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E9ECEF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Toolbar -->
+            <RowDefinition Height="*"/>    <!-- Main View -->
+            <RowDefinition Height="Auto"/> <!-- Bottom Segment Visualizer -->
+            <RowDefinition Height="24"/>   <!-- Status Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- Top Action Toolbar -->
+        <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="8,6">
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                    <Button Content="➕ Add URL" Style="{StaticResource AccentToolbarButtonStyle}" Click="AddUrl_Click"/>
+                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Button Content="▶ Resume" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ResumeDownloadCommand}"/>
+                    <Button Content="⏸ Pause" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PauseDownloadCommand}"/>
+                    <Button Content="⏹ Stop" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CancelDownloadCommand}"/>
+                    <Button Content="🗑 Remove" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RemoveDownloadCommand}"/>
+                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Button Content="📁 Open File" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenFileCommand}"/>
+                    <Button Content="📂 Folder" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenFolderCommand}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <Button Content="▶ Start Queue" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StartQueueCommand}"/>
+                    <Button Content="⏸ Pause Queue" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopQueueCommand}"/>
+                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Button Content="⚙ Settings" Style="{StaticResource ToolbarButtonStyle}" Click="OpenSettings_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Main Body: Two Pane (Left Category Sidebar, Right Virtualized DataGrid) -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" MinWidth="160" MaxWidth="300"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Category Navigation Sidebar -->
+            <Border Grid.Column="0" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="4,8">
+                        <TextBlock Text="DOWNLOADS" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="12,6,0,4"/>
+                        <Button Content="📥 All Downloads" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="All"/>
+                        <Button Content="⏳ Downloading" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Downloading"/>
+                        <Button Content="✅ Completed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Completed"/>
+                        <Button Content="⏸ Paused" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Paused"/>
+                        <Button Content="❌ Failed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Failed"/>
+
+                        <Separator Margin="8,8" Background="#E0E0E0"/>
+                        <TextBlock Text="CATEGORIES" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="12,6,0,4"/>
+                        <Button Content="📦 Compressed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Compressed"/>
+                        <Button Content="📄 Documents" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Documents"/>
+                        <Button Content="🎵 Music" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Music"/>
+                        <Button Content="💻 Programs" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Programs"/>
+                        <Button Content="🎬 Video" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Video"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Right Download DataGrid -->
+            <DataGrid Grid.Column="1" 
+                      ItemsSource="{Binding FilteredDownloads}"
+                      SelectedItem="{Binding SelectedDownload, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      IsReadOnly="True"
+                      SelectionMode="Single"
+                      GridLinesVisibility="Horizontal"
+                      HorizontalGridLinesBrush="#EEEEEE"
+                      Background="White"
+                      RowHeight="36"
+                      BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="250">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Margin" Value="8,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="140">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Margin" Value="6,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Status" Binding="{Binding StatusFormatted}" Width="100">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Margin" Value="6,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTemplateColumn Header="Progress" Width="180">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid Margin="6,0" VerticalAlignment="Center">
+                                    <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Height="14" Minimum="0" Maximum="100"/>
+                                    <TextBlock Text="{Binding ProgressPercentage, StringFormat={}{0:F1}%}" 
+                                               HorizontalAlignment="Center" 
+                                               VerticalAlignment="Center" 
+                                               FontSize="10" 
+                                               Foreground="#222222" 
+                                               FontWeight="SemiBold"/>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="Transfer Rate" Binding="{Binding SpeedFormatted}" Width="110">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Margin" Value="6,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Time Left" Binding="{Binding RemainingTimeFormatted}" Width="90">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Margin" Value="6,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn Header="Date Added" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="130">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="Foreground" Value="#777777"/>
+                                <Setter Property="Margin" Value="6,0"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <!-- Bottom Segment Visualizer Panel -->
+        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="12,8">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,4">
+                    <TextBlock Text="Segment Download Visualizer" FontSize="11" FontWeight="Bold" Foreground="#666666" DockPanel.Dock="Left"/>
+                    <TextBlock Text="{Binding SelectedDownload.FileName, FallbackValue='No download selected'}" FontSize="11" Foreground="#888888" DockPanel.Dock="Right"/>
+                </DockPanel>
+
+                <!-- Segments ItemsControl -->
+                <ItemsControl ItemsSource="{Binding SelectedDownload.Segments}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Rows="1"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="2,0" Background="#E9ECEF" CornerRadius="2" Height="18" ToolTip="{Binding CurrentOffset, StringFormat='Offset: {0}'}">
+                                <Grid>
+                                    <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="18" Foreground="#0067C0"/>
+                                    <TextBlock Text="{Binding Index, StringFormat='S{0}'}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Foreground="#333333"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Bottom Status Bar -->
+        <StatusBar Grid.Row="3" Background="#E9ECEF" Foreground="#555555" FontSize="11">
+            <StatusBarItem Content="{Binding StatusMessage}"/>
+            <Separator Margin="4,2"/>
+            <StatusBarItem Content="{Binding Downloads.Count, StringFormat='Total: {0} items'}"/>
+        </StatusBar>
+    </Grid>
+</Window>

@@ -1,0 +1,9 @@
+{
+  "name": "com.ydm.downloader",
+  "description": "YDM (Your Download Manager) Native Messaging Host",
+  "path": "YDM.Host.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://*/"
+  ]
+}
