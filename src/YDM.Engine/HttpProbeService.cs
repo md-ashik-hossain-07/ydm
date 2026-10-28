@@ -34,7 +34,7 @@ public class HttpProbeService : IHttpProbeService
             {
                 Timeout = TimeSpan.FromSeconds(30)
             };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 YDM/1.0");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YDM/1.0 (Windows NT 10.0; Win64; x64)");
         }
     }
 
@@ -74,6 +74,10 @@ public class HttpProbeService : IHttpProbeService
             {
                 request.Headers.UserAgent.Clear();
                 request.Headers.UserAgent.ParseAdd(userAgent);
+            }
+            else if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+            {
+                request.Headers.UserAgent.ParseAdd("YDM/1.0 (Windows NT 10.0; Win64; x64)");
             }
 
             var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);

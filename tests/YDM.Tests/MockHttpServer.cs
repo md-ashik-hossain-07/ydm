@@ -76,6 +76,26 @@ public class MockHttpServer : IDisposable
                 return;
             }
 
+            if (path == "/forbidden")
+            {
+                res.StatusCode = (int)HttpStatusCode.Forbidden;
+                res.StatusDescription = "Forbidden";
+                byte[] msg = Encoding.UTF8.GetBytes("Access denied");
+                await res.OutputStream.WriteAsync(msg);
+                res.Close();
+                return;
+            }
+
+            if (path == "/unknown-length")
+            {
+                res.StatusCode = (int)HttpStatusCode.OK;
+                res.SendChunked = true;
+                res.Headers.Add("Accept-Ranges", "none");
+                await res.OutputStream.WriteAsync(TestData);
+                res.Close();
+                return;
+            }
+
             if (path == "/no-range")
             {
                 res.StatusCode = (int)HttpStatusCode.OK;

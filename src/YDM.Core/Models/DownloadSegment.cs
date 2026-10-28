@@ -18,5 +18,5 @@ public class DownloadSegment
     public long TotalBytes => EndOffset >= StartOffset ? (EndOffset - StartOffset + 1) : 0;
     public long DownloadedBytes => CurrentOffset >= StartOffset ? (CurrentOffset - StartOffset) : 0;
     public double ProgressPercentage => TotalBytes > 0 ? Math.Clamp((double)DownloadedBytes / TotalBytes * 100.0, 0.0, 100.0) : 0.0;
-    public bool IsComplete => CurrentOffset > EndOffset || (TotalBytes > 0 && DownloadedBytes >= TotalBytes);
+    public bool IsComplete => Status == SegmentStatus.Completed || (EndOffset >= 0 && CurrentOffset > EndOffset) || (TotalBytes > 0 && DownloadedBytes >= TotalBytes);
 }

@@ -180,4 +180,151 @@ public class DownloadEngineIntegrationTests
             }
         }
     }
+
+    [Fact]
+    public void DownloadSegment_UnknownLength_IsNotPrematurelyComplete()
+    {
+        var segment = new DownloadSegment
+        {
+            Index = 0,
+            StartOffset = 0,
+            CurrentOffset = 0,
+            EndOffset = -1,
+            Status = SegmentStatus.Pending
+        };
+
+        // When EndOffset is -1 (unknown length stream), it must NOT be complete at 0 bytes!
+        Assert.False(segment.IsComplete);
+
+        segment.CurrentOffset = 1024;
+        Assert.False(segment.IsComplete);
+
+        segment.Status = SegmentStatus.Completed;
+        Assert.True(segment.IsComplete);
+    }
+
+    [Fact]
+    public async Task DownloadEngine_ExecutesUnknownLengthChunkedStream_Successfully()
+    {
+        using var server = new MockHttpServer(dataSize: 64 * 1024);
+        string testDir = Path.Combine(Path.GetTempPath(), $"ydm_chunked_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testDir);
+
+        string dbPath = Path.Combine(testDir, "test.db");
+        var connectionFactory = new SqliteConnectionFactory(dbPath);
+        var repo = new SqliteDownloadRepository(connectionFactory);
+        await repo.InitializeAsync();
+
+        var engine = new DownloadEngine(repo);
+
+        try
+        {
+            var job = await engine.AddDownloadAsync(
+                url: $"{server.BaseUrl}unknown-length",
+                destinationDirectory: testDir,
+                customFileName: "chunked_test.bin");
+
+            Assert.Single(job.Segments);
+            Assert.False(job.Segments[0].IsComplete);
+
+            await engine.StartAsync(job.Id);
+
+            var finishedJob = await repo.GetByIdAsync(job.Id);
+            Assert.NotNull(finishedJob);
+            Assert.Equal(JobStatus.Completed, finishedJob.Status);
+            Assert.True(File.Exists(finishedJob.DestinationPath));
+
+            byte[] downloaded = await File.ReadAllBytesAsync(finishedJob.DestinationPath);
+            Assert.Equal(server.TestData.Length, downloaded.Length);
+            Assert.Equal(SHA256.HashData(server.TestData), SHA256.HashData(downloaded));
+        }
+        finally
+        {
+            if (Directory.Exists(testDir))
+            {
+                try { Directory.Delete(testDir, recursive: true); } catch { }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadEngine_Http403Forbidden_ProducesMeaningfulErrorMessage()
+    {
+        using var server = new MockHttpServer();
+        string testDir = Path.Combine(Path.GetTempPath(), $"ydm_403_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testDir);
+
+        string dbPath = Path.Combine(testDir, "test.db");
+        var connectionFactory = new SqliteConnectionFactory(dbPath);
+        var repo = new SqliteDownloadRepository(connectionFactory);
+        await repo.InitializeAsync();
+
+        var engine = new DownloadEngine(repo);
+
+        try
+        {
+            var job = await engine.AddDownloadAsync(
+                url: $"{server.BaseUrl}forbidden",
+                destinationDirectory: testDir,
+                customFileName: "forbidden.bin");
+
+            await engine.StartAsync(job.Id);
+
+            var failedJob = await repo.GetByIdAsync(job.Id);
+            Assert.NotNull(failedJob);
+            Assert.Equal(JobStatus.Failed, failedJob.Status);
+            Assert.False(string.IsNullOrWhiteSpace(failedJob.ErrorMessage));
+            Assert.Contains("403", failedJob.ErrorMessage);
+            Assert.DoesNotContain("Segment temp file not found", failedJob.ErrorMessage);
+        }
+        finally
+        {
+            if (Directory.Exists(testDir))
+            {
+                try { Directory.Delete(testDir, recursive: true); } catch { }
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadEngine_LiveW3cDummyPdf_DownloadsAndVerifiesIntegrity()
+    {
+        string liveUrl = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+        string testDir = Path.Combine(Path.GetTempPath(), $"ydm_w3c_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testDir);
+
+        string dbPath = Path.Combine(testDir, "test.db");
+        var connectionFactory = new SqliteConnectionFactory(dbPath);
+        var repo = new SqliteDownloadRepository(connectionFactory);
+        await repo.InitializeAsync();
+
+        var engine = new DownloadEngine(repo);
+
+        try
+        {
+            var job = await engine.AddDownloadAsync(
+                url: liveUrl,
+                destinationDirectory: testDir);
+
+            Assert.Equal("dummy.pdf", job.FileName);
+            Assert.Equal(13264, job.TotalBytes);
+            Assert.True(job.IsResumable);
+
+            await engine.StartAsync(job.Id);
+
+            var finishedJob = await repo.GetByIdAsync(job.Id);
+            Assert.NotNull(finishedJob);
+            Assert.Equal(JobStatus.Completed, finishedJob.Status);
+            Assert.Equal(13264, finishedJob.DownloadedBytes);
+            Assert.True(File.Exists(finishedJob.DestinationPath));
+            Assert.Equal(13264, new FileInfo(finishedJob.DestinationPath).Length);
+        }
+        finally
+        {
+            if (Directory.Exists(testDir))
+            {
+                try { Directory.Delete(testDir, recursive: true); } catch { }
+            }
+        }
+    }
 }

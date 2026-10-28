@@ -59,7 +59,7 @@ public class DownloadEngine : IDownloadEngine
             {
                 Timeout = TimeSpan.FromSeconds(60)
             };
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 YDM/1.0");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YDM/1.0 (Windows NT 10.0; Win64; x64)");
         }
     }
 
@@ -108,12 +108,21 @@ public class DownloadEngine : IDownloadEngine
             }
             else
             {
-                job.FileName = PathSanitizer.SanitizeFileName(!string.IsNullOrWhiteSpace(customFileName) ? customFileName : "download.dat");
+                // Preserve resolved filename when possible, but do not treat failed probe as successful download
+                string fallbackName = !string.IsNullOrWhiteSpace(customFileName)
+                    ? customFileName
+                    : (!string.IsNullOrWhiteSpace(probe.SuggestedFileName) ? probe.SuggestedFileName : HttpProbeService.ExtractFileName(null, url));
+
+                job.FileName = PathSanitizer.SanitizeFileName(fallbackName);
             }
         }
         catch
         {
-            job.FileName = PathSanitizer.SanitizeFileName(!string.IsNullOrWhiteSpace(customFileName) ? customFileName : "download.dat");
+            string fallbackName = !string.IsNullOrWhiteSpace(customFileName)
+                ? customFileName
+                : HttpProbeService.ExtractFileName(null, url);
+
+            job.FileName = PathSanitizer.SanitizeFileName(fallbackName);
         }
 
         string safeTargetDir = !string.IsNullOrWhiteSpace(destinationDirectory) 
@@ -229,6 +238,7 @@ public class DownloadEngine : IDownloadEngine
                 job.Status = JobStatus.Completed;
                 job.CompletedAt = DateTime.UtcNow;
                 job.DownloadedBytes = job.TotalBytes ?? job.Segments.Sum(s => s.DownloadedBytes);
+                job.TotalBytes ??= job.DownloadedBytes;
                 job.SpeedBytesPerSecond = 0;
                 job.RemainingTime = TimeSpan.Zero;
 

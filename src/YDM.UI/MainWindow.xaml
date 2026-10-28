@@ -164,6 +164,7 @@
                             <Style TargetType="TextBlock">
                                 <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Setter Property="Margin" Value="6,0"/>
+                                <Setter Property="ToolTip" Value="{Binding ErrorMessage}"/>
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
@@ -218,6 +219,24 @@
         <!-- Bottom Segment Visualizer Panel -->
         <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="12,8">
             <StackPanel>
+                <!-- Visible Error Details Banner for Selected Failed Download -->
+                <Border Background="#FDE8E8" BorderBrush="#F87171" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,8">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SelectedDownload.Status}" Value="Failed">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <DockPanel LastChildFill="True">
+                        <TextBlock Text="⚠ Download Error:" FontWeight="Bold" Foreground="#991B1B" FontSize="11" Margin="0,0,8,0" DockPanel.Dock="Left"/>
+                        <TextBlock Text="{Binding SelectedDownload.ErrorMessage, FallbackValue='An error occurred during download.'}" Foreground="#B91C1C" FontSize="11" TextWrapping="Wrap"/>
+                    </DockPanel>
+                </Border>
+
                 <DockPanel LastChildFill="False" Margin="0,0,0,4">
                     <TextBlock Text="Segment Download Visualizer" FontSize="11" FontWeight="Bold" Foreground="#666666" DockPanel.Dock="Left"/>
                     <TextBlock Text="{Binding SelectedDownload.FileName, FallbackValue='No download selected'}" FontSize="11" Foreground="#888888" DockPanel.Dock="Right"/>

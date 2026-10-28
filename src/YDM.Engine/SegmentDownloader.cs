@@ -89,6 +89,10 @@ public class SegmentDownloader : ISegmentDownloader
             request.Headers.UserAgent.Clear();
             request.Headers.UserAgent.ParseAdd(job.UserAgent);
         }
+        else if (httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+        {
+            request.Headers.UserAgent.ParseAdd("YDM/1.0 (Windows NT 10.0; Win64; x64)");
+        }
 
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
 
