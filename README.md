@@ -27,18 +27,37 @@
 
 ## 1. Core Features
 
-- **Multi-Connection HTTP Range Acceleration:** Probes remote server capabilities (RFC 7233 / RFC 9110 `206 Partial Content`, `Accept-Ranges: bytes`) and splits files across parallel TCP connections.
-- **Dynamic In-Flight Segmentation:** Divides the largest active incomplete segment at its midpoint during download, keeping connections saturated without gaps or overlapping ranges.
-- **Resilient Pause & Resume:** Downloads resume from verified on-disk checkpoints. Validates remote server state via `ETag` and `Last-Modified` timestamps.
-- **Graceful Single-Stream Fallback:** If a remote server ignores Range requests (`200 OK`) or omits byte ranges, YDM automatically degrades to single-stream sequential downloading.
-- **ACID Persistence (SQLite WAL):** Download histories, segment offsets, and queue states persist in an ACID SQLite 3 database with Write-Ahead Logging (`ydm.db`), surviving system restarts and power outages.
-- **Queue & Priority Management:** Concurrency throttler (`SemaphoreSlim`) limits active downloads (default: 2 simultaneous), manages priorities (`High`, `Normal`, `Low`), and auto-dequeues pending jobs.
-- **Security & Privacy by Design:**
-  - Strict path sanitization (`PathSanitizer`) strips directory traversal attempts (`../`, `..\`) and reserved DOS device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
-  - SSRF protection blocks loopback (`127.0.0.1`, `::1`) and RFC 1918 private IP addresses by default.
-  - Attaches NTFS `Zone.Identifier` (`ZoneId=3`) so Windows Defender and SmartScreen inspect downloaded binaries.
-  - Zero telemetry, zero analytics tracking, and no complete browser cookie jar harvesting.
-- **Chromium Manifest V3 Integration:** Lightweight extension for Chrome and Edge communicating over sandboxed Native Messaging (`stdio`). Only cancels browser downloads after YDM acknowledges job acceptance.
+- **Smart Download Acceleration (Adaptive Sizing & Retries):**
+  - Probes remote server capabilities (RFC 7233 / RFC 9110 `206 Partial Content`, `Accept-Ranges: bytes`) and splits files across parallel TCP connections.
+  - Dynamically calculates connection counts based on payload size (minimum 64 KB per segment; avoids multi-connection overhead on small files).
+  - Exponential backoff retry policy for transient network drops and HTTP 429/503 responses, with immediate fail-fast handling for permanent 4xx errors (400, 401, 403, 404).
+- **Dual Browser Integration (Chrome & Edge):**
+  - Chromium Manifest V3 extension communicating over sandboxed Native Messaging (`stdio`).
+  - Supports 3 configurable interception modes: **Automatic** (catches all file downloads), **Ask First** (confirmation dialog), and **Manual** (via context menu or popup sniffer).
+  - Detailed in-popup connection diagnostics and registration troubleshooting guides.
+- **Modern WPF UI with Seamless Dark Mode:**
+  - Modern fluent-styled interface with dynamic theme switching (**Dark**, **Light**, or **Follow System**).
+  - Empty-state illustrations, clear download progress bars, real-time download speeds, and category filters.
+  - Redesigned 4-tab Settings dialog (General, Appearance, Integration, Queue & Storage).
+- **Smart Queue, Scheduler & Interrupted Job Recovery:**
+  - SQLite schema v2 with `ScheduledAt` column for deferring download jobs.
+  - Automatic time-window scheduler (`QueueScheduleStartTime` to `QueueScheduleStopTime`).
+  - Resilient crash recovery: automatically resets interrupted or assembling downloads back to `Queued` on application launch.
+- **Categorization & Searchable History:**
+  - Real-time search filter matching filenames and source URLs instantly.
+  - Categorized sidebar views (All, Compressed, Documents, Applications, Audio, Video).
+  - One-click "Clear History" to purge completed jobs with user confirmation.
+- **Clipboard URL Monitoring & Non-Stealing Notifications:**
+  - Background clipboard watcher on the UI thread detecting downloadable file URLs with a 60-second duplicate suppression cooldown.
+  - Non-focus-stealing bottom-right toast notifications upon download completion or failure, featuring "Open File" and "Open Folder" actions.
+- **Browser Media & Video Sniffer:**
+  - Content script detects direct HTML5 video/audio streams (`<video>`, `<audio>`, `<source>`, `.mp4`, `.webm`, `.m3u8`, `.mp3`) on active web tabs.
+  - One-click "Download with YDM" buttons in the extension popup.
+  - Clear legal disclosures: handles direct HTTP/HLS media streams; does not circumvent DRM or proprietary ciphers.
+- **Robust Destination & Default Folder Management:**
+  - Pre-flight destination path validation checking directory existence, drive readiness, write permissions, and disk space capacity.
+  - Configurable duplicate resolution policies: **Auto-Rename** (e.g., `file (1).zip`), **Prompt**, or **Overwrite**.
+  - "Set as default download location" checkbox in Add Download dialog for seamless workflow persistence.
 
 ---
 
@@ -150,7 +169,7 @@ The resulting setup installer is saved in `dist/ydm_setup_1.0.0_win-x64.exe`.
 
 ## 7. Running the Automated Test Suite
 
-YDM includes 38 automated unit and integration tests executing against an in-process local HTTP mock server:
+YDM includes 60 automated unit and integration tests executing against an in-process local HTTP mock server and live endpoints:
 
 ```powershell
 dotnet test tests/YDM.Tests/YDM.Tests.csproj --configuration Release
@@ -158,13 +177,19 @@ dotnet test tests/YDM.Tests/YDM.Tests.csproj --configuration Release
 
 ### Verified Scenarios:
 - Multi-connection partial content downloads with bit-exact SHA-256 verification.
+- Live W3C PDF download (`dummy.pdf`, 13,264 bytes) with content-length and status verification.
+- Adaptive connection sizing (small files under 64 KB capped to 1 segment; 100 MB files scaled up to max concurrency).
+- Destination directory write permission, invalid drive detection, and pre-flight disk capacity validation.
+- Duplicate filename resolution (auto-numbering `file (1).ext`, `file (2).ext` vs overwrite).
+- SQLite schema migration (v1 to v2 adding `ScheduledAt` column while preserving download history).
+- Interrupted and crashed download recovery (recovering `Downloading` and `Assembling` jobs to `Queued`).
+- Settings repository persistence (Theme, Scheduler times, Default directory, Interception mode, Clipboard monitoring).
 - Graceful degradation on non-range servers (`Accept-Ranges: none`).
 - Safe pause and resume without byte loss.
 - Server ETag alteration detection and safe segment invalidation on resume.
 - Cancellation mid-flight without leaving corrupted final destination files.
 - Path traversal rejection and Windows DOS device name sanitization (`CON`, `_aux.tar.gz`).
 - SSRF loopback and private IP blocking.
-- Process restart recovery in SQLite database.
 - Process-level stdio Native Messaging framing (`YDM.Host.exe`).
 
 ---

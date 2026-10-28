@@ -111,7 +111,7 @@ public class SegmentDownloader : ISegmentDownloader
 
         if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.PartialContent)
         {
-            throw new HttpRequestException($"Server responded with HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
+            throw new HttpRequestException($"Server responded with HTTP {(int)response.StatusCode} ({response.ReasonPhrase})", null, response.StatusCode);
         }
 
         await using var contentStream = await response.Content.ReadAsStreamAsync(ct);

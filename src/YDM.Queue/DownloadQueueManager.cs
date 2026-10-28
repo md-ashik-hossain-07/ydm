@@ -16,9 +16,13 @@ public interface IDownloadQueueManager
     bool IsRunning { get; }
     int ActiveDownloadsCount { get; }
     int MaxConcurrency { get; set; }
+    bool ScheduleEnabled { get; set; }
+    string? ScheduleStartTime { get; set; }
+    string? ScheduleStopTime { get; set; }
 
     event EventHandler? QueueUpdated;
 
+    Task RecoverInterruptedJobsAsync();
     Task StartQueueAsync(CancellationToken ct = default);
     Task StopQueueAsync();
     Task EnqueueJobAsync(Guid jobId);
@@ -48,6 +52,10 @@ public class DownloadQueueManager : IDownloadQueueManager
         set => _maxConcurrency = Math.Clamp(value, 1, 10);
     }
 
+    public bool ScheduleEnabled { get; set; }
+    public string? ScheduleStartTime { get; set; }
+    public string? ScheduleStopTime { get; set; }
+
     public event EventHandler? QueueUpdated;
 
     public DownloadQueueManager(IDownloadEngine engine, IDownloadRepository repository, int maxConcurrency = 2)
@@ -58,6 +66,19 @@ public class DownloadQueueManager : IDownloadQueueManager
         _concurrencySemaphore = new SemaphoreSlim(_maxConcurrency, _maxConcurrency);
 
         _engine.StateChanged += OnEngineStateChanged;
+    }
+
+    public async Task RecoverInterruptedJobsAsync()
+    {
+        var allJobs = await _repository.GetAllAsync();
+        foreach (var job in allJobs)
+        {
+            if (job.Status is JobStatus.Downloading or JobStatus.Probing or JobStatus.Connecting or JobStatus.Assembling)
+            {
+                await _repository.UpdateJobStatusAsync(job.Id, JobStatus.Queued);
+            }
+        }
+        QueueUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     public Task StartQueueAsync(CancellationToken ct = default)
@@ -153,6 +174,16 @@ public class DownloadQueueManager : IDownloadQueueManager
         {
             try
             {
+                if (ScheduleEnabled && !string.IsNullOrWhiteSpace(ScheduleStopTime))
+                {
+                    string now = DateTime.Now.ToString("HH:mm");
+                    if (string.Equals(now, ScheduleStopTime, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await StopQueueAsync();
+                        break;
+                    }
+                }
+
                 await TryLaunchNextJobsAsync(ct);
                 await Task.Delay(1000, ct);
             }
@@ -176,7 +207,7 @@ public class DownloadQueueManager : IDownloadQueueManager
 
         var allJobs = await _repository.GetAllAsync();
         var candidates = allJobs
-            .Where(j => j.Status == JobStatus.Queued)
+            .Where(j => j.Status == JobStatus.Queued && (!j.ScheduledAt.HasValue || j.ScheduledAt.Value <= DateTime.UtcNow))
             .OrderByDescending(j => j.Priority)
             .ThenBy(j => j.CreatedAt)
             .Take(availableSlots)

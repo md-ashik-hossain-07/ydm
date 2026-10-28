@@ -25,11 +25,13 @@ public partial class App : Application
             await settingsRepository.InitializeAsync();
 
             var settings = await settingsRepository.GetSettingsAsync();
+            YDM.UI.Services.ThemeManager.ApplyTheme(settings.Theme);
 
             var engine = new DownloadEngine(downloadRepository);
             var queueManager = new DownloadQueueManager(engine, downloadRepository, settings.MaxConcurrentDownloads);
+            var notificationService = new YDM.UI.Services.NotificationService(settingsRepository);
 
-            var mainViewModel = new MainViewModel(engine, downloadRepository, queueManager, settingsRepository);
+            var mainViewModel = new MainViewModel(engine, downloadRepository, queueManager, settingsRepository, notificationService);
             var mainWindow = new MainWindow(mainViewModel, settingsRepository);
 
             MainWindow = mainWindow;

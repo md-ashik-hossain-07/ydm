@@ -6,6 +6,15 @@ using System.Text;
 
 namespace YDM.Core.Security;
 
+public record DestinationValidationResult(bool IsValid, string? ErrorMessage = null);
+
+public enum DuplicateResolution
+{
+    AutoRename,
+    Overwrite,
+    Prompt
+}
+
 public static class PathSanitizer
 {
     private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
@@ -63,6 +72,11 @@ public static class PathSanitizer
 
     public static string GetSafeDestinationPath(string targetDirectory, string rawFileName)
     {
+        return ResolveDestinationPath(targetDirectory, rawFileName, DuplicateResolution.AutoRename);
+    }
+
+    public static string ResolveDestinationPath(string targetDirectory, string rawFileName, DuplicateResolution resolution = DuplicateResolution.AutoRename)
+    {
         if (string.IsNullOrWhiteSpace(targetDirectory))
         {
             targetDirectory = Path.Combine(
@@ -80,12 +94,12 @@ public static class PathSanitizer
             throw new SecurityException("Potential path traversal detected in destination path.");
         }
 
-        // Handle collision by appending (1), (2), etc.
-        if (!File.Exists(fullDestination))
+        if (!File.Exists(fullDestination) || resolution == DuplicateResolution.Overwrite)
         {
             return fullDestination;
         }
 
+        // Handle collision by appending (1), (2), etc.
         string baseName = Path.GetFileNameWithoutExtension(sanitizedName);
         string extension = Path.GetExtension(sanitizedName);
 
@@ -99,6 +113,61 @@ public static class PathSanitizer
         }
 
         return Path.Combine(fullTargetDir, $"{baseName}_{Guid.NewGuid():N}{extension}");
+    }
+
+    public static DestinationValidationResult ValidateDestinationDirectory(string targetDirectory, long? requiredBytes = null)
+    {
+        if (string.IsNullOrWhiteSpace(targetDirectory))
+        {
+            return new DestinationValidationResult(false, "Download folder path cannot be empty.");
+        }
+
+        try
+        {
+            string fullPath = Path.GetFullPath(targetDirectory);
+            string? root = Path.GetPathRoot(fullPath);
+
+            if (!string.IsNullOrEmpty(root))
+            {
+                var drive = new DriveInfo(root);
+                if (!drive.IsReady)
+                {
+                    return new DestinationValidationResult(false, $"Selected drive '{root}' is not accessible or is disconnected. Please choose a valid storage location.");
+                }
+
+                if (requiredBytes.HasValue && requiredBytes.Value > 0)
+                {
+                    if (drive.AvailableFreeSpace < requiredBytes.Value)
+                    {
+                        double reqMb = requiredBytes.Value / (1024.0 * 1024.0);
+                        double availMb = drive.AvailableFreeSpace / (1024.0 * 1024.0);
+                        return new DestinationValidationResult(false, $"Insufficient disk space on drive '{root}'. Required: {reqMb:F1} MB, Available: {availMb:F1} MB.");
+                    }
+                }
+            }
+
+            if (!Directory.Exists(fullPath))
+            {
+                Directory.CreateDirectory(fullPath);
+            }
+
+            // Test write permission with transient test file
+            string testFile = Path.Combine(fullPath, $".ydm_write_test_{Guid.NewGuid():N}.tmp");
+            using (var fs = File.Create(testFile, 1, FileOptions.DeleteOnClose))
+            {
+                fs.WriteByte(0);
+            }
+
+            return new DestinationValidationResult(true);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new DestinationValidationResult(false, $"Access denied. You do not have write permission for directory '{targetDirectory}'.");
+        }
+        catch (Exception ex)
+        {
+            return new DestinationValidationResult(false, $"Invalid or inaccessible download location: {ex.Message}");
+        }
     }
 
     public static string GetTempDirectory(Guid jobId)

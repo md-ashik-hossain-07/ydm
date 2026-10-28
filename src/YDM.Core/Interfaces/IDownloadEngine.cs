@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using YDM.Core.Events;
 using YDM.Core.Models;
+using YDM.Core.Security;
 
 namespace YDM.Core.Interfaces;
 
@@ -45,6 +46,7 @@ public interface IDownloadEngine
         string? referrer = null,
         string? cookies = null,
         string? userAgent = null,
+        DuplicateResolution duplicateResolution = DuplicateResolution.AutoRename,
         CancellationToken ct = default);
 
     Task StartAsync(Guid jobId, CancellationToken ct = default);

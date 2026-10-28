@@ -1,11 +1,16 @@
 // YDM Chromium Manifest V3 Background Service Worker
 const NATIVE_HOST = "com.ydm.downloader";
 
+// In-memory media cache per tab
+const detectedMediaByTab = new Map();
+
 // Initialize extension defaults
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.get(["interceptionEnabled", "sendDomainCookies"], (res) => {
-    if (res.interceptionEnabled === undefined) {
-      chrome.storage.sync.set({ interceptionEnabled: true });
+  chrome.storage.sync.get(["interceptionMode", "interceptionEnabled", "sendDomainCookies"], (res) => {
+    let mode = res.interceptionMode;
+    if (!mode) {
+      mode = res.interceptionEnabled === false ? "manual" : "automatic";
+      chrome.storage.sync.set({ interceptionMode: mode });
     }
     if (res.sendDomainCookies === undefined) {
       chrome.storage.sync.set({ sendDomainCookies: false });
@@ -34,11 +39,50 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
+// Communication with content scripts & popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "MEDIA_DETECTED" && sender.tab && sender.tab.id) {
+    const list = detectedMediaByTab.get(sender.tab.id) || [];
+    for (const item of message.media) {
+      if (!list.some(m => m.url === item.url)) {
+        list.push(item);
+      }
+    }
+    detectedMediaByTab.set(sender.tab.id, list);
+    sendResponse({ received: true });
+    return true;
+  }
+
+  if (message.type === "GET_MEDIA" && message.tabId) {
+    const list = detectedMediaByTab.get(message.tabId) || [];
+    sendResponse({ media: list });
+    return true;
+  }
+
+  if (message.type === "DOWNLOAD_MEDIA" && message.url) {
+    sendDownloadToYdm({
+      action: "download",
+      url: message.url,
+      referrer: message.referrer,
+      fileName: message.fileName
+    });
+    sendResponse({ status: "dispatched" });
+    return true;
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  detectedMediaByTab.delete(tabId);
+});
+
 // Intercept browser downloads via chrome.downloads API
 chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
-  chrome.storage.sync.get(["interceptionEnabled", "sendDomainCookies"], async (settings) => {
-    if (!settings.interceptionEnabled) {
-      suggest(); // Leave download to Chrome
+  chrome.storage.sync.get(["interceptionMode", "interceptionEnabled", "sendDomainCookies"], async (settings) => {
+    const mode = settings.interceptionMode || (settings.interceptionEnabled === false ? "manual" : "automatic");
+
+    // In 'manual' mode, do not intercept browser downloads
+    if (mode === "manual") {
+      suggest();
       return;
     }
 
@@ -80,7 +124,6 @@ chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
         if (response && response.status === "accepted") {
           // Cancel browser download only after YDM successfully accepted the job
           chrome.downloads.cancel(downloadItem.id, () => {
-            // Clear from browser download shelf
             chrome.downloads.erase({ id: downloadItem.id });
           });
         } else {

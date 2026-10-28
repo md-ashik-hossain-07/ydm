@@ -28,15 +28,25 @@ public partial class MainViewModel : ObservableObject
     private readonly IDownloadRepository _repository;
     private readonly IDownloadQueueManager _queueManager;
     private readonly ISettingsRepository _settingsRepository;
+    private readonly Services.NotificationService? _notificationService;
 
     public ObservableCollection<DownloadItemViewModel> Downloads { get; } = new();
     public ICollectionView FilteredDownloads { get; }
+    public IDownloadQueueManager QueueManager => _queueManager;
 
     [ObservableProperty]
     private DownloadItemViewModel? _selectedDownload;
 
     [ObservableProperty]
     private string _selectedCategory = "All";
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        FilteredDownloads.Refresh();
+    }
 
     [ObservableProperty]
     private bool _isQueueRunning;
@@ -50,12 +60,14 @@ public partial class MainViewModel : ObservableObject
         IDownloadEngine engine, 
         IDownloadRepository repository, 
         IDownloadQueueManager queueManager,
-        ISettingsRepository settingsRepository)
+        ISettingsRepository settingsRepository,
+        Services.NotificationService? notificationService = null)
     {
         _engine = engine;
         _repository = repository;
         _queueManager = queueManager;
         _settingsRepository = settingsRepository;
+        _notificationService = notificationService;
 
         FilteredDownloads = CollectionViewSource.GetDefaultView(Downloads);
         FilteredDownloads.Filter = FilterDownloadItem;
@@ -69,6 +81,8 @@ public partial class MainViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
+        await _queueManager.RecoverInterruptedJobsAsync();
+
         var jobs = await _repository.GetAllAsync();
         Application.Current?.Dispatcher.Invoke(() =>
         {
@@ -81,18 +95,45 @@ public partial class MainViewModel : ObservableObject
         });
 
         var settings = await _settingsRepository.GetSettingsAsync();
+        _queueManager.ScheduleEnabled = settings.QueueScheduleEnabled;
+        _queueManager.ScheduleStartTime = settings.QueueScheduleStartTime;
+        _queueManager.ScheduleStopTime = settings.QueueScheduleStopTime;
+
         if (settings.AutoStartDownloads)
         {
             await _queueManager.StartQueueAsync();
             IsQueueRunning = true;
         }
+
+        StartQueueSchedulerTimer();
+    }
+
+    private void StartQueueSchedulerTimer()
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(30)
+        };
+        timer.Tick += async (s, e) =>
+        {
+            var settings = await _settingsRepository.GetSettingsAsync();
+            if (!settings.QueueScheduleEnabled || string.IsNullOrWhiteSpace(settings.QueueScheduleStartTime)) return;
+
+            string now = DateTime.Now.ToString("HH:mm");
+            if (string.Equals(now, settings.QueueScheduleStartTime, StringComparison.OrdinalIgnoreCase) && !_queueManager.IsRunning)
+            {
+                await _queueManager.StartQueueAsync();
+                StatusMessage = "Queue automatically started by scheduler";
+            }
+        };
+        timer.Start();
     }
 
     private bool FilterDownloadItem(object obj)
     {
         if (obj is not DownloadItemViewModel item) return false;
 
-        return SelectedCategory switch
+        bool matchesCategory = SelectedCategory switch
         {
             "All" => true,
             "Downloading" => item.Status == JobStatus.Downloading || item.Status == JobStatus.Probing || item.Status == JobStatus.Connecting || item.Status == JobStatus.Assembling,
@@ -106,11 +147,49 @@ public partial class MainViewModel : ObservableObject
             "Video" => item.Category == DownloadCategory.Video,
             _ => true
         };
+
+        if (!matchesCategory) return false;
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            string query = SearchText.Trim();
+            return item.FileName.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || item.Url.Contains(query, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return true;
     }
 
     partial void OnSelectedCategoryChanged(string value)
     {
         FilteredDownloads.Refresh();
+    }
+
+    [RelayCommand]
+    public async Task ClearCompletedHistoryAsync()
+    {
+        var completed = Downloads.Where(d => d.Status == JobStatus.Completed).ToList();
+        if (completed.Count == 0)
+        {
+            MessageBox.Show("No completed downloads found to clear.", "Clear History", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Remove {completed.Count} completed download records from history?\n\nNote: Downloaded files on disk will NOT be deleted.",
+            "Clear Completed History",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+
+        if (confirm == MessageBoxResult.Yes)
+        {
+            foreach (var item in completed)
+            {
+                await _repository.DeleteJobAsync(item.Id);
+                Downloads.Remove(item);
+            }
+            StatusMessage = $"Cleared {completed.Count} completed items from history";
+        }
     }
 
     [RelayCommand]
@@ -226,13 +305,24 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    public async Task AddDownloadDirectAsync(string url, string? destFolder = null, string? customName = null, int connections = 8, bool startImmediately = true)
+    public async Task AddDownloadDirectAsync(
+        string url, 
+        string? destFolder = null, 
+        string? customName = null, 
+        int connections = 8, 
+        bool startImmediately = true,
+        YDM.Core.Security.DuplicateResolution duplicateResolution = YDM.Core.Security.DuplicateResolution.AutoRename,
+        string? referrer = null,
+        string? cookies = null)
     {
         var job = await _engine.AddDownloadAsync(
             url: url,
             destinationDirectory: destFolder,
             customFileName: customName,
-            maxConnections: connections);
+            maxConnections: connections,
+            referrer: referrer,
+            cookies: cookies,
+            duplicateResolution: duplicateResolution);
 
         var vm = new DownloadItemViewModel(job);
         Application.Current?.Dispatcher.Invoke(() =>
@@ -256,13 +346,26 @@ public partial class MainViewModel : ObservableObject
         });
     }
 
-    private void OnEngineStateChanged(object? sender, JobStateChangedEventArgs e)
+    private async void OnEngineStateChanged(object? sender, JobStateChangedEventArgs e)
     {
+        var job = await _repository.GetByIdAsync(e.JobId);
         Application.Current?.Dispatcher.Invoke(() =>
         {
             var item = Downloads.FirstOrDefault(d => d.Id == e.JobId);
             item?.UpdateStatus(e.NewStatus, e.ErrorMessage);
             FilteredDownloads.Refresh();
+
+            if (job != null)
+            {
+                if (e.NewStatus == JobStatus.Completed)
+                {
+                    _notificationService?.ShowJobCompletedNotification(job);
+                }
+                else if (e.NewStatus == JobStatus.Failed)
+                {
+                    _notificationService?.ShowJobFailedNotification(job, e.ErrorMessage);
+                }
+            }
         });
     }
 
@@ -310,8 +413,20 @@ public partial class MainViewModel : ObservableObject
                         string? action = root.TryGetProperty("action", out var actProp) ? actProp.GetString() : null;
                         string? url = root.TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
                         string? filename = root.TryGetProperty("fileName", out var fnProp) ? fnProp.GetString() : null;
+                        string? referrer = root.TryGetProperty("referrer", out var refProp) ? refProp.GetString() : null;
+                        string? cookies = root.TryGetProperty("cookies", out var cProp) ? cProp.GetString() : null;
 
-                        if (string.Equals(action, "download", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(url))
+                        if (string.Equals(action, "ping", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string response = JsonSerializer.Serialize(new { status = "ok", message = "YDM UI is active" });
+                            byte[] respBytes = Encoding.UTF8.GetBytes(response);
+                            byte[] respLen = BitConverter.GetBytes(respBytes.Length);
+
+                            await server.WriteAsync(respLen, token);
+                            await server.WriteAsync(respBytes, token);
+                            await server.FlushAsync(token);
+                        }
+                        else if (string.Equals(action, "download", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(url))
                         {
                             var settings = await _settingsRepository.GetSettingsAsync();
                             await AddDownloadDirectAsync(
@@ -319,7 +434,9 @@ public partial class MainViewModel : ObservableObject
                                 destFolder: settings.DefaultDownloadDirectory, 
                                 customName: filename, 
                                 connections: settings.DefaultConnectionsPerDownload, 
-                                startImmediately: settings.AutoStartDownloads);
+                                startImmediately: settings.AutoStartDownloads,
+                                referrer: referrer,
+                                cookies: cookies);
 
                             string response = JsonSerializer.Serialize(new { status = "accepted" });
                             byte[] respBytes = Encoding.UTF8.GetBytes(response);

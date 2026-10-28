@@ -64,6 +64,33 @@ public class SqliteSettingsRepository : ISettingsRepository
         if (dict.TryGetValue("AllowLocalIpAddresses", out var allowLocal) && bool.TryParse(allowLocal, out var ala))
             settings.AllowLocalIpAddresses = ala;
 
+        if (dict.TryGetValue("Theme", out var theme) && !string.IsNullOrWhiteSpace(theme))
+            settings.Theme = theme;
+
+        if (dict.TryGetValue("EnableClipboardMonitoring", out var clip) && bool.TryParse(clip, out var ecm))
+            settings.EnableClipboardMonitoring = ecm;
+
+        if (dict.TryGetValue("EnableNotifications", out var notif) && bool.TryParse(notif, out var en))
+            settings.EnableNotifications = en;
+
+        if (dict.TryGetValue("InterceptionMode", out var mode) && !string.IsNullOrWhiteSpace(mode))
+            settings.InterceptionMode = mode;
+
+        if (dict.TryGetValue("QueueScheduleEnabled", out var schedEn) && bool.TryParse(schedEn, out var qse))
+            settings.QueueScheduleEnabled = qse;
+
+        if (dict.TryGetValue("QueueScheduleStartTime", out var schedStart))
+            settings.QueueScheduleStartTime = schedStart;
+
+        if (dict.TryGetValue("QueueScheduleStopTime", out var schedStop))
+            settings.QueueScheduleStopTime = schedStop;
+
+        if (dict.TryGetValue("ConfirmFileDeletion", out var confDel) && bool.TryParse(confDel, out var cfd))
+            settings.ConfirmFileDeletion = cfd;
+
+        if (dict.TryGetValue("DuplicateFileAction", out var dupAct) && !string.IsNullOrWhiteSpace(dupAct))
+            settings.DuplicateFileAction = dupAct;
+
         return settings;
     }
 
@@ -81,7 +108,16 @@ public class SqliteSettingsRepository : ISettingsRepository
             ["EnableBrowserInterception"] = settings.EnableBrowserInterception.ToString(),
             ["SpeedLimitBytesPerSecond"] = settings.SpeedLimitBytesPerSecond.ToString(),
             ["NetworkTimeoutSeconds"] = settings.NetworkTimeoutSeconds.ToString(),
-            ["AllowLocalIpAddresses"] = settings.AllowLocalIpAddresses.ToString()
+            ["AllowLocalIpAddresses"] = settings.AllowLocalIpAddresses.ToString(),
+            ["Theme"] = settings.Theme,
+            ["EnableClipboardMonitoring"] = settings.EnableClipboardMonitoring.ToString(),
+            ["EnableNotifications"] = settings.EnableNotifications.ToString(),
+            ["InterceptionMode"] = settings.InterceptionMode,
+            ["QueueScheduleEnabled"] = settings.QueueScheduleEnabled.ToString(),
+            ["QueueScheduleStartTime"] = settings.QueueScheduleStartTime ?? string.Empty,
+            ["QueueScheduleStopTime"] = settings.QueueScheduleStopTime ?? string.Empty,
+            ["ConfirmFileDeletion"] = settings.ConfirmFileDeletion.ToString(),
+            ["DuplicateFileAction"] = settings.DuplicateFileAction
         };
 
         foreach (var kvp in dict)

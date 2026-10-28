@@ -28,6 +28,7 @@ public class DownloadJob
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? CompletedAt { get; set; }
+    public DateTime? ScheduledAt { get; set; }
     public string? ErrorMessage { get; set; }
     
     public long SpeedBytesPerSecond { get; set; }

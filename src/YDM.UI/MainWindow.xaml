@@ -6,28 +6,27 @@
         xmlns:vm="clr-namespace:YDM.UI.ViewModels"
         mc:Ignorable="d"
         Title="YDM — Your Download Manager" 
-        Height="650" Width="1050"
-        MinHeight="450" MinWidth="750"
+        Height="650" Width="1080"
+        MinHeight="450" MinWidth="780"
         WindowStartupLocation="CenterScreen"
-        Background="#F3F3F3"
+        Background="{DynamicResource AppBackgroundBrush}"
         FontFamily="Segoe UI">
     
     <Window.Resources>
         <!-- Modern Button Style -->
         <Style x:Key="ToolbarButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="9,3"/>
             <Setter Property="Margin" Value="2,0"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColorBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#222222"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E5E5E5"/>
-                    <Setter Property="BorderBrush" Value="#CCCCCC"/>
+                    <Setter Property="Background" Value="{DynamicResource ButtonHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.4"/>
@@ -36,13 +35,13 @@
         </Style>
 
         <Style x:Key="AccentToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
-            <Setter Property="Background" Value="#0067C0"/>
-            <Setter Property="BorderBrush" Value="#005A9E"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#005A9E"/>
-                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -54,12 +53,12 @@
             <Setter Property="Margin" Value="4,2"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#E9ECEF"/>
+                    <Setter Property="Background" Value="{DynamicResource ButtonHoverBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -74,24 +73,31 @@
         </Grid.RowDefinitions>
 
         <!-- Top Action Toolbar -->
-        <Border Grid.Row="0" Background="#FAFAFA" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="8,6">
+        <Border Grid.Row="0" Background="{DynamicResource HeaderBackgroundBrush}" BorderBrush="{DynamicResource BorderColorBrush}" BorderThickness="0,0,0,1" Padding="8,6">
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
                     <Button Content="➕ Add URL" Style="{StaticResource AccentToolbarButtonStyle}" Click="AddUrl_Click"/>
-                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Separator Margin="6,4" Width="1" Background="{DynamicResource BorderColorBrush}"/>
                     <Button Content="▶ Resume" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ResumeDownloadCommand}"/>
                     <Button Content="⏸ Pause" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding PauseDownloadCommand}"/>
                     <Button Content="⏹ Stop" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding CancelDownloadCommand}"/>
                     <Button Content="🗑 Remove" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding RemoveDownloadCommand}"/>
-                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Button Content="🧹 Clear History" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding ClearCompletedHistoryCommand}" ToolTip="Clear completed downloads from history"/>
+                    <Separator Margin="6,4" Width="1" Background="{DynamicResource BorderColorBrush}"/>
                     <Button Content="📁 Open File" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenFileCommand}"/>
                     <Button Content="📂 Folder" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding OpenFolderCommand}"/>
+                </StackPanel>
+
+                <!-- Search Box in Toolbar -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="🔍" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,4,0"/>
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Width="160" Height="28" VerticalContentAlignment="Center" ToolTip="Search downloads by filename or URL" Background="{DynamicResource CardBackgroundBrush}" Foreground="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderColorBrush}"/>
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
                     <Button Content="▶ Start Queue" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StartQueueCommand}"/>
                     <Button Content="⏸ Pause Queue" Style="{StaticResource ToolbarButtonStyle}" Command="{Binding StopQueueCommand}"/>
-                    <Separator Margin="6,4" Width="1" Background="#DDDDDD"/>
+                    <Separator Margin="6,4" Width="1" Background="{DynamicResource BorderColorBrush}"/>
                     <Button Content="⚙ Settings" Style="{StaticResource ToolbarButtonStyle}" Click="OpenSettings_Click"/>
                 </StackPanel>
             </DockPanel>
@@ -105,18 +111,18 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Category Navigation Sidebar -->
-            <Border Grid.Column="0" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,0,1,0">
+            <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource BorderColorBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="4,8">
-                        <TextBlock Text="DOWNLOADS" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="12,6,0,4"/>
+                        <TextBlock Text="DOWNLOADS" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="12,6,0,4"/>
                         <Button Content="📥 All Downloads" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="All"/>
                         <Button Content="⏳ Downloading" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Downloading"/>
                         <Button Content="✅ Completed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Completed"/>
                         <Button Content="⏸ Paused" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Paused"/>
                         <Button Content="❌ Failed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Failed"/>
 
-                        <Separator Margin="8,8" Background="#E0E0E0"/>
-                        <TextBlock Text="CATEGORIES" FontSize="11" FontWeight="Bold" Foreground="#888888" Margin="12,6,0,4"/>
+                        <Separator Margin="8,8" Background="{DynamicResource BorderColorBrush}"/>
+                        <TextBlock Text="CATEGORIES" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" Margin="12,6,0,4"/>
                         <Button Content="📦 Compressed" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Compressed"/>
                         <Button Content="📄 Documents" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Documents"/>
                         <Button Content="🎵 Music" Style="{StaticResource CategoryButtonStyle}" Click="Category_Click" Tag="Music"/>
@@ -126,101 +132,126 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- Right Download DataGrid -->
-            <DataGrid Grid.Column="1" 
-                      ItemsSource="{Binding FilteredDownloads}"
-                      SelectedItem="{Binding SelectedDownload, Mode=TwoWay}"
-                      AutoGenerateColumns="False"
-                      CanUserAddRows="False"
-                      IsReadOnly="True"
-                      SelectionMode="Single"
-                      GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="#EEEEEE"
-                      Background="White"
-                      RowHeight="36"
-                      BorderThickness="0">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="250">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Margin" Value="8,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+            <!-- Right Download DataGrid & Empty State Container -->
+            <Grid Grid.Column="1" Background="{DynamicResource CardBackgroundBrush}">
+                <!-- Empty State Message -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Downloads.Count}" Value="0">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="📥" FontSize="44" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock Text="No downloads yet" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Click '+ Add URL' or use the browser extension to start downloading." FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                </StackPanel>
 
-                    <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="140">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Margin" Value="6,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                <!-- DataGrid -->
+                <DataGrid ItemsSource="{Binding FilteredDownloads}"
+                          SelectedItem="{Binding SelectedDownload, Mode=TwoWay}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource GridLineBrush}"
+                          Background="{DynamicResource CardBackgroundBrush}"
+                          Foreground="{DynamicResource TextPrimaryBrush}"
+                          RowHeight="36"
+                          BorderThickness="0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="File Name" Binding="{Binding FileName}" Width="250">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Margin" Value="8,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
 
-                    <DataGridTextColumn Header="Status" Binding="{Binding StatusFormatted}" Width="100">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Margin" Value="6,0"/>
-                                <Setter Property="ToolTip" Value="{Binding ErrorMessage}"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                        <DataGridTextColumn Header="Size" Binding="{Binding SizeFormatted}" Width="140">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
 
-                    <DataGridTemplateColumn Header="Progress" Width="180">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Grid Margin="6,0" VerticalAlignment="Center">
-                                    <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Height="14" Minimum="0" Maximum="100"/>
-                                    <TextBlock Text="{Binding ProgressPercentage, StringFormat={}{0:F1}%}" 
-                                               HorizontalAlignment="Center" 
-                                               VerticalAlignment="Center" 
-                                               FontSize="10" 
-                                               Foreground="#222222" 
-                                               FontWeight="SemiBold"/>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Status" Binding="{Binding StatusFormatted}" Width="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                    <Setter Property="ToolTip" Value="{Binding ErrorMessage}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
 
-                    <DataGridTextColumn Header="Transfer Rate" Binding="{Binding SpeedFormatted}" Width="110">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Margin" Value="6,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                        <DataGridTemplateColumn Header="Progress" Width="180">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="6,0" VerticalAlignment="Center">
+                                        <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Height="14" Minimum="0" Maximum="100" Foreground="{DynamicResource AccentBrush}"/>
+                                        <TextBlock Text="{Binding ProgressPercentage, StringFormat={}{0:F1}%}" 
+                                                   HorizontalAlignment="Center" 
+                                                   VerticalAlignment="Center" 
+                                                   FontSize="10" 
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" 
+                                                   FontWeight="SemiBold"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
 
-                    <DataGridTextColumn Header="Time Left" Binding="{Binding RemainingTimeFormatted}" Width="90">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Margin" Value="6,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
+                        <DataGridTextColumn Header="Transfer Rate" Binding="{Binding SpeedFormatted}" Width="110">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
 
-                    <DataGridTextColumn Header="Date Added" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="130">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Foreground" Value="#777777"/>
-                                <Setter Property="Margin" Value="6,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                </DataGrid.Columns>
-            </DataGrid>
+                        <DataGridTextColumn Header="Time Left" Binding="{Binding RemainingTimeFormatted}" Width="90">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Date Added" Binding="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Width="130">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                    <Setter Property="Margin" Value="6,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
         </Grid>
 
         <!-- Bottom Segment Visualizer Panel -->
-        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="12,8">
+        <Border Grid.Row="2" Background="{DynamicResource SidebarBackgroundBrush}" BorderBrush="{DynamicResource BorderColorBrush}" BorderThickness="0,1,0,0" Padding="12,8">
             <StackPanel>
                 <!-- Visible Error Details Banner for Selected Failed Download -->
-                <Border Background="#FDE8E8" BorderBrush="#F87171" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,8">
+                <Border Background="{DynamicResource ErrorBackgroundBrush}" BorderBrush="{DynamicResource ErrorBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="10,6" Margin="0,0,0,8">
                     <Border.Style>
                         <Style TargetType="Border">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -232,14 +263,14 @@
                         </Style>
                     </Border.Style>
                     <DockPanel LastChildFill="True">
-                        <TextBlock Text="⚠ Download Error:" FontWeight="Bold" Foreground="#991B1B" FontSize="11" Margin="0,0,8,0" DockPanel.Dock="Left"/>
-                        <TextBlock Text="{Binding SelectedDownload.ErrorMessage, FallbackValue='An error occurred during download.'}" Foreground="#B91C1C" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="⚠ Download Error:" FontWeight="Bold" Foreground="{DynamicResource ErrorTextBrush}" FontSize="11" Margin="0,0,8,0" DockPanel.Dock="Left"/>
+                        <TextBlock Text="{Binding SelectedDownload.ErrorMessage, FallbackValue='An error occurred during download.'}" Foreground="{DynamicResource ErrorTextBrush}" FontSize="11" TextWrapping="Wrap"/>
                     </DockPanel>
                 </Border>
 
                 <DockPanel LastChildFill="False" Margin="0,0,0,4">
-                    <TextBlock Text="Segment Download Visualizer" FontSize="11" FontWeight="Bold" Foreground="#666666" DockPanel.Dock="Left"/>
-                    <TextBlock Text="{Binding SelectedDownload.FileName, FallbackValue='No download selected'}" FontSize="11" Foreground="#888888" DockPanel.Dock="Right"/>
+                    <TextBlock Text="Segment Download Visualizer" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Left"/>
+                    <TextBlock Text="{Binding SelectedDownload.FileName, FallbackValue='No download selected'}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" DockPanel.Dock="Right"/>
                 </DockPanel>
 
                 <!-- Segments ItemsControl -->
@@ -251,10 +282,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="2,0" Background="#E9ECEF" CornerRadius="2" Height="18" ToolTip="{Binding CurrentOffset, StringFormat='Offset: {0}'}">
+                            <Border Margin="2,0" Background="{DynamicResource AppBackgroundBrush}" CornerRadius="2" Height="18" ToolTip="{Binding CurrentOffset, StringFormat='Offset: {0}'}">
                                 <Grid>
-                                    <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="18" Foreground="#0067C0"/>
-                                    <TextBlock Text="{Binding Index, StringFormat='S{0}'}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Foreground="#333333"/>
+                                    <ProgressBar Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="18" Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="{Binding Index, StringFormat='S{0}'}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 </Grid>
                             </Border>
                         </DataTemplate>
@@ -264,9 +295,9 @@
         </Border>
 
         <!-- Bottom Status Bar -->
-        <StatusBar Grid.Row="3" Background="#E9ECEF" Foreground="#555555" FontSize="11">
+        <StatusBar Grid.Row="3" Background="{DynamicResource StatusBarBackgroundBrush}" Foreground="{DynamicResource StatusBarForegroundBrush}" FontSize="11">
             <StatusBarItem Content="{Binding StatusMessage}"/>
-            <Separator Margin="4,2"/>
+            <Separator Margin="4,2" Background="{DynamicResource BorderColorBrush}"/>
             <StatusBarItem Content="{Binding Downloads.Count, StringFormat='Total: {0} items'}"/>
         </StatusBar>
     </Grid>

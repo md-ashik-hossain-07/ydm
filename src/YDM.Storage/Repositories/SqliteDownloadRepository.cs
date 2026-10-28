@@ -76,11 +76,11 @@ public class SqliteDownloadRepository : IDownloadRepository
             INSERT INTO Downloads (
                 Id, Url, Referrer, Cookies, UserAgent, FileName, DestinationPath, TempDirectory,
                 TotalBytes, DownloadedBytes, IsResumable, ETag, LastModified, Status, Priority,
-                MaxConnections, CreatedAt, CompletedAt, ErrorMessage
+                MaxConnections, CreatedAt, CompletedAt, ScheduledAt, ErrorMessage
             ) VALUES (
                 @Id, @Url, @Referrer, @Cookies, @UserAgent, @FileName, @DestinationPath, @TempDirectory,
                 @TotalBytes, @DownloadedBytes, @IsResumable, @ETag, @LastModified, @Status, @Priority,
-                @MaxConnections, @CreatedAt, @CompletedAt, @ErrorMessage
+                @MaxConnections, @CreatedAt, @CompletedAt, @ScheduledAt, @ErrorMessage
             )
             ON CONFLICT(Id) DO UPDATE SET
                 Url = excluded.Url,
@@ -99,6 +99,7 @@ public class SqliteDownloadRepository : IDownloadRepository
                 Priority = excluded.Priority,
                 MaxConnections = excluded.MaxConnections,
                 CompletedAt = excluded.CompletedAt,
+                ScheduledAt = excluded.ScheduledAt,
                 ErrorMessage = excluded.ErrorMessage;
         ";
 
@@ -120,6 +121,7 @@ public class SqliteDownloadRepository : IDownloadRepository
         cmd.Parameters.AddWithValue("@MaxConnections", job.MaxConnections);
         cmd.Parameters.AddWithValue("@CreatedAt", job.CreatedAt.ToString("o"));
         cmd.Parameters.AddWithValue("@CompletedAt", job.CompletedAt.HasValue ? job.CompletedAt.Value.ToString("o") : (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@ScheduledAt", job.ScheduledAt.HasValue ? job.ScheduledAt.Value.ToString("o") : (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@ErrorMessage", (object?)job.ErrorMessage ?? DBNull.Value);
 
         await cmd.ExecuteNonQueryAsync();
@@ -284,9 +286,20 @@ public class SqliteDownloadRepository : IDownloadRepository
             Status = (JobStatus)reader.GetInt32(reader.GetOrdinal("Status")),
             Priority = (DownloadPriority)reader.GetInt32(reader.GetOrdinal("Priority")),
             MaxConnections = reader.GetInt32(reader.GetOrdinal("MaxConnections")),
-            CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt")), CultureInfo.InvariantCulture),
-            CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("CompletedAt")), CultureInfo.InvariantCulture),
+            CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt")), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            CompletedAt = reader.IsDBNull(reader.GetOrdinal("CompletedAt")) ? null : DateTime.Parse(reader.GetString(reader.GetOrdinal("CompletedAt")), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            ScheduledAt = HasColumn(reader, "ScheduledAt") && !reader.IsDBNull(reader.GetOrdinal("ScheduledAt")) ? DateTime.Parse(reader.GetString(reader.GetOrdinal("ScheduledAt")), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind) : null,
             ErrorMessage = reader.IsDBNull(reader.GetOrdinal("ErrorMessage")) ? null : reader.GetString(reader.GetOrdinal("ErrorMessage"))
         };
+    }
+
+    private static bool HasColumn(DbDataReader reader, string columnName)
+    {
+        for (int i = 0; i < reader.FieldCount; i++)
+        {
+            if (string.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 }

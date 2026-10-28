@@ -54,6 +54,7 @@ public class MigrationService
                         MaxConnections INTEGER NOT NULL DEFAULT 8,
                         CreatedAt TEXT NOT NULL,
                         CompletedAt TEXT,
+                        ScheduledAt TEXT,
                         ErrorMessage TEXT
                     );
 
@@ -79,7 +80,19 @@ public class MigrationService
                         Value TEXT NOT NULL
                     );
 
-                    PRAGMA user_version = 1;
+                    PRAGMA user_version = 2;
+                ";
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+        else if (currentVersion < 2)
+        {
+            using (var cmd = connection.CreateCommand())
+            {
+                cmd.Transaction = transaction;
+                cmd.CommandText = @"
+                    ALTER TABLE Downloads ADD COLUMN ScheduledAt TEXT;
+                    PRAGMA user_version = 2;
                 ";
                 await cmd.ExecuteNonQueryAsync();
             }

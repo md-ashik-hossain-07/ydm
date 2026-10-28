@@ -72,6 +72,7 @@ public class DownloadEngine : IDownloadEngine
         string? referrer = null,
         string? cookies = null,
         string? userAgent = null,
+        DuplicateResolution duplicateResolution = DuplicateResolution.AutoRename,
         CancellationToken ct = default)
     {
         var job = new DownloadJob
@@ -129,10 +130,10 @@ public class DownloadEngine : IDownloadEngine
             ? destinationDirectory 
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
 
-        job.DestinationPath = PathSanitizer.GetSafeDestinationPath(safeTargetDir, job.FileName);
+        job.DestinationPath = PathSanitizer.ResolveDestinationPath(safeTargetDir, job.FileName, duplicateResolution);
 
-        // Create initial segments
-        int initialConnections = job.IsResumable ? job.MaxConnections : 1;
+        // Create initial segments with adaptive connection sizing (minimum 64 KB per segment)
+        int initialConnections = CalculateAdaptiveConnections(job.TotalBytes, job.IsResumable, job.MaxConnections);
         job.Segments = DynamicSegmentSplitter.CreateInitialSegments(job, initialConnections);
 
         await _repository.SaveJobAsync(job);
@@ -159,6 +160,22 @@ public class DownloadEngine : IDownloadEngine
         var token = cts.Token;
 
         var oldStatus = job.Status;
+
+        // Verify destination directory accessibility, drive readiness, and disk space
+        string targetDir = Path.GetDirectoryName(job.DestinationPath) ?? string.Empty;
+        var dirValidation = PathSanitizer.ValidateDestinationDirectory(targetDir, job.TotalBytes);
+        if (!dirValidation.IsValid)
+        {
+            job.Status = JobStatus.Failed;
+            job.ErrorMessage = dirValidation.ErrorMessage;
+            _activeTokens.TryRemove(job.Id, out _);
+            _activeJobs.TryRemove(job.Id, out _);
+            cts.Dispose();
+            await _repository.UpdateJobStatusAsync(job.Id, JobStatus.Failed, dirValidation.ErrorMessage);
+            StateChanged?.Invoke(this, new JobStateChangedEventArgs(job.Id, oldStatus, JobStatus.Failed, dirValidation.ErrorMessage));
+            return;
+        }
+
         job.Status = JobStatus.Downloading;
         await _repository.UpdateJobStatusAsync(job.Id, JobStatus.Downloading);
         StateChanged?.Invoke(this, new JobStateChangedEventArgs(job.Id, oldStatus, JobStatus.Downloading));
@@ -277,22 +294,56 @@ public class DownloadEngine : IDownloadEngine
         IProgress<long> progress, 
         CancellationToken ct)
     {
-        try
+        int maxRetries = 3;
+        for (int attempt = 0; attempt <= maxRetries; attempt++)
         {
-            await _segmentDownloader.DownloadSegmentAsync(job, segment, _httpClient, progress, ct);
-            await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, segment.Status);
-        }
-        catch (OperationCanceledException)
-        {
-            segment.Status = SegmentStatus.Pending;
-            await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Pending);
-            throw;
-        }
-        catch
-        {
-            segment.Status = SegmentStatus.Failed;
-            await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Failed);
-            throw;
+            try
+            {
+                await _segmentDownloader.DownloadSegmentAsync(job, segment, _httpClient, progress, ct);
+                await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, segment.Status);
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                segment.Status = SegmentStatus.Pending;
+                await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Pending);
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                if (ex.StatusCode.HasValue)
+                {
+                    int code = (int)ex.StatusCode.Value;
+                    // Do not retry permanent HTTP errors
+                    if (code is 400 or 401 or 403 or 404 or 405 or 410)
+                    {
+                        segment.Status = SegmentStatus.Failed;
+                        await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Failed);
+                        throw;
+                    }
+                }
+
+                if (attempt == maxRetries)
+                {
+                    segment.Status = SegmentStatus.Failed;
+                    await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Failed);
+                    throw;
+                }
+
+                int delayMs = ex.StatusCode == (System.Net.HttpStatusCode)429 ? 2000 : 500 * (1 << attempt);
+                await Task.Delay(delayMs, ct);
+            }
+            catch (Exception)
+            {
+                if (attempt == maxRetries)
+                {
+                    segment.Status = SegmentStatus.Failed;
+                    await _repository.UpdateSegmentProgressAsync(segment.Id, segment.CurrentOffset, SegmentStatus.Failed);
+                    throw;
+                }
+
+                await Task.Delay(500 * (1 << attempt), ct);
+            }
         }
     }
 
@@ -390,5 +441,16 @@ public class DownloadEngine : IDownloadEngine
 
             await _repository.DeleteJobAsync(jobId);
         }
+    }
+
+    public static int CalculateAdaptiveConnections(long? totalBytes, bool isResumable, int maxConnections)
+    {
+        if (!isResumable || !totalBytes.HasValue || totalBytes.Value <= 0)
+        {
+            return 1;
+        }
+
+        int maxSegmentsForSize = Math.Max(1, (int)(totalBytes.Value / (64 * 1024)));
+        return Math.Clamp(maxConnections, 1, maxSegmentsForSize);
     }
 }
