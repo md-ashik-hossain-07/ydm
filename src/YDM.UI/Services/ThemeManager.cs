@@ -9,6 +9,8 @@ public static class ThemeManager
     private const string RegistryKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
     private const string RegistryValueName = "AppsUseLightTheme";
 
+    public static bool IsDarkThemeActive { get; private set; }
+
     public static void ApplyTheme(string themePreference)
     {
         bool useDark = false;
@@ -25,6 +27,8 @@ public static class ThemeManager
         {
             useDark = IsSystemInDarkMode();
         }
+
+        IsDarkThemeActive = useDark;
 
         string themeUri = useDark 
             ? "pack://application:,,,/YDM.UI;component/Themes/DarkTheme.xaml"

@@ -35,4 +35,8 @@ public class ApplicationSettings
     // File Management
     public bool ConfirmFileDeletion { get; set; } = true;
     public string DuplicateFileAction { get; set; } = "Prompt"; // "Prompt", "AutoRename", "Overwrite"
+    
+    // UI View State
+    public string ViewMode { get; set; } = "Grid"; // "Grid", "List"
+    public bool ShowDetailsPanel { get; set; } = true;
 }

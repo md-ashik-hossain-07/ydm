@@ -37,6 +37,13 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private DownloadItemViewModel? _selectedDownload;
 
+    partial void OnSelectedDownloadChanged(DownloadItemViewModel? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedDownload));
+    }
+
+    public bool HasSelectedDownload => SelectedDownload != null;
+
     [ObservableProperty]
     private string _selectedCategory = "All";
 
@@ -53,6 +60,23 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statusMessage = "Ready";
+
+    [ObservableProperty]
+    private bool _isGridView = true;
+
+    [ObservableProperty]
+    private bool _isDarkMode;
+
+    [ObservableProperty]
+    private string _sortOption = "Date Added";
+
+    partial void OnSortOptionChanged(string value)
+    {
+        ApplySorting(value);
+    }
+
+    [ObservableProperty]
+    private string _selectedDetailTab = "Details";
 
     private CancellationTokenSource? _ipcServerCts;
 
@@ -91,6 +115,8 @@ public partial class MainViewModel : ObservableObject
             {
                 Downloads.Add(new DownloadItemViewModel(job));
             }
+            RefreshCounters();
+            ApplySorting(SortOption);
             StatusMessage = $"Loaded {Downloads.Count} downloads";
         });
 
@@ -98,6 +124,9 @@ public partial class MainViewModel : ObservableObject
         _queueManager.ScheduleEnabled = settings.QueueScheduleEnabled;
         _queueManager.ScheduleStartTime = settings.QueueScheduleStartTime;
         _queueManager.ScheduleStopTime = settings.QueueScheduleStopTime;
+
+        IsGridView = !string.Equals(settings.ViewMode, "List", StringComparison.OrdinalIgnoreCase);
+        IsDarkMode = Services.ThemeManager.IsDarkThemeActive;
 
         if (settings.AutoStartDownloads)
         {
@@ -129,6 +158,28 @@ public partial class MainViewModel : ObservableObject
         timer.Start();
     }
 
+    private void ApplySorting(string option)
+    {
+        FilteredDownloads.SortDescriptions.Clear();
+        switch (option)
+        {
+            case "Name":
+                FilteredDownloads.SortDescriptions.Add(new SortDescription(nameof(DownloadItemViewModel.FileName), ListSortDirection.Ascending));
+                break;
+            case "Size":
+                FilteredDownloads.SortDescriptions.Add(new SortDescription(nameof(DownloadItemViewModel.TotalBytes), ListSortDirection.Descending));
+                break;
+            case "Status":
+                FilteredDownloads.SortDescriptions.Add(new SortDescription(nameof(DownloadItemViewModel.Status), ListSortDirection.Ascending));
+                break;
+            case "Date Added":
+            default:
+                FilteredDownloads.SortDescriptions.Add(new SortDescription(nameof(DownloadItemViewModel.CreatedAt), ListSortDirection.Descending));
+                break;
+        }
+        FilteredDownloads.Refresh();
+    }
+
     private bool FilterDownloadItem(object obj)
     {
         if (obj is not DownloadItemViewModel item) return false;
@@ -145,6 +196,7 @@ public partial class MainViewModel : ObservableObject
             "Music" => item.Category == DownloadCategory.Music,
             "Programs" => item.Category == DownloadCategory.Programs,
             "Video" => item.Category == DownloadCategory.Video,
+            "Others" => item.Category == DownloadCategory.Other,
             _ => true
         };
 
@@ -163,6 +215,192 @@ public partial class MainViewModel : ObservableObject
     partial void OnSelectedCategoryChanged(string value)
     {
         FilteredDownloads.Refresh();
+    }
+
+    // Counters and Metrics for Sidebar and Status Bar
+    public int TotalCount => Downloads.Count;
+    public int DownloadingCount => Downloads.Count(d => d.Status is JobStatus.Downloading or JobStatus.Connecting or JobStatus.Probing or JobStatus.Assembling);
+    public int CompletedCount => Downloads.Count(d => d.Status == JobStatus.Completed);
+    public int PausedCount => Downloads.Count(d => d.Status == JobStatus.Paused);
+    public int FailedCount => Downloads.Count(d => d.Status == JobStatus.Failed);
+    public int QueuedCount => Downloads.Count(d => d.Status == JobStatus.Queued);
+
+    public int AllCategoriesCount => Downloads.Count;
+    public int DocumentsCount => Downloads.Count(d => d.Category == DownloadCategory.Documents);
+    public int CompressedCount => Downloads.Count(d => d.Category == DownloadCategory.Compressed);
+    public int VideoCount => Downloads.Count(d => d.Category == DownloadCategory.Video);
+    public int MusicCount => Downloads.Count(d => d.Category == DownloadCategory.Music);
+    public int ProgramsCount => Downloads.Count(d => d.Category == DownloadCategory.Programs);
+    public int OthersCount => Downloads.Count(d => d.Category == DownloadCategory.Other);
+
+    public string CurrentCategoryTitle => SelectedCategory switch
+    {
+        "All" => $"All Downloads ({TotalCount})",
+        "Downloading" => $"Downloading ({DownloadingCount})",
+        "Completed" => $"Completed ({CompletedCount})",
+        "Paused" => $"Paused ({PausedCount})",
+        "Failed" => $"Failed ({FailedCount})",
+        "Documents" => $"Documents ({DocumentsCount})",
+        "Compressed" => $"Compressed ({CompressedCount})",
+        "Video" => $"Video ({VideoCount})",
+        "Music" => $"Music ({MusicCount})",
+        "Programs" => $"Programs ({ProgramsCount})",
+        "Others" => $"Others ({OthersCount})",
+        _ => $"{SelectedCategory} ({FilteredDownloads.Cast<object>().Count()})"
+    };
+
+    public string TotalSpeedFormatted
+    {
+        get
+        {
+            long speed = Downloads.Where(d => d.Status is JobStatus.Downloading or JobStatus.Connecting or JobStatus.Probing or JobStatus.Assembling)
+                                  .Sum(d => d.SpeedBytesPerSecond);
+            return speed > 0 ? $"{DownloadItemViewModel.FormatBytes(speed)}/s" : "0.0 KB/s";
+        }
+    }
+
+    public string TotalTransferredProgressFormatted
+    {
+        get
+        {
+            long downloaded = Downloads.Sum(d => d.DownloadedBytes);
+            long total = Downloads.Sum(d => d.TotalBytes ?? d.DownloadedBytes);
+            if (total > 0)
+            {
+                return $"{DownloadItemViewModel.FormatBytes(downloaded)} / {DownloadItemViewModel.FormatBytes(total)}";
+            }
+            return $"{DownloadItemViewModel.FormatBytes(downloaded)}";
+        }
+    }
+
+    public void RefreshCounters()
+    {
+        OnPropertyChanged(nameof(TotalCount));
+        OnPropertyChanged(nameof(DownloadingCount));
+        OnPropertyChanged(nameof(CompletedCount));
+        OnPropertyChanged(nameof(PausedCount));
+        OnPropertyChanged(nameof(FailedCount));
+        OnPropertyChanged(nameof(QueuedCount));
+        OnPropertyChanged(nameof(AllCategoriesCount));
+        OnPropertyChanged(nameof(DocumentsCount));
+        OnPropertyChanged(nameof(CompressedCount));
+        OnPropertyChanged(nameof(VideoCount));
+        OnPropertyChanged(nameof(MusicCount));
+        OnPropertyChanged(nameof(ProgramsCount));
+        OnPropertyChanged(nameof(OthersCount));
+        OnPropertyChanged(nameof(CurrentCategoryTitle));
+        OnPropertyChanged(nameof(TotalSpeedFormatted));
+        OnPropertyChanged(nameof(TotalTransferredProgressFormatted));
+    }
+
+    [RelayCommand]
+    public async Task SetGridViewAsync()
+    {
+        IsGridView = true;
+        var s = await _settingsRepository.GetSettingsAsync();
+        s.ViewMode = "Grid";
+        await _settingsRepository.SaveSettingsAsync(s);
+    }
+
+    [RelayCommand]
+    public async Task SetListViewAsync()
+    {
+        IsGridView = false;
+        var s = await _settingsRepository.GetSettingsAsync();
+        s.ViewMode = "List";
+        await _settingsRepository.SaveSettingsAsync(s);
+    }
+
+    [RelayCommand]
+    public async Task ToggleThemeAsync()
+    {
+        IsDarkMode = !IsDarkMode;
+        string newTheme = IsDarkMode ? "Dark" : "Light";
+        Services.ThemeManager.ApplyTheme(newTheme);
+        var s = await _settingsRepository.GetSettingsAsync();
+        s.Theme = newTheme;
+        await _settingsRepository.SaveSettingsAsync(s);
+    }
+
+    [RelayCommand]
+    public void CloseDetailsPanel()
+    {
+        SelectedDownload = null;
+    }
+
+    [RelayCommand]
+    public void CopyUrl()
+    {
+        if (SelectedDownload == null || string.IsNullOrWhiteSpace(SelectedDownload.Url)) return;
+        Clipboard.SetText(SelectedDownload.Url);
+        StatusMessage = "URL copied to clipboard";
+    }
+
+    [RelayCommand]
+    public void CopySaveLocation()
+    {
+        if (SelectedDownload == null || string.IsNullOrWhiteSpace(SelectedDownload.DestinationPath)) return;
+        Clipboard.SetText(SelectedDownload.DestinationPath);
+        StatusMessage = "File path copied to clipboard";
+    }
+
+    [RelayCommand]
+    public async Task RedownloadAsync()
+    {
+        if (SelectedDownload == null) return;
+        string url = SelectedDownload.Url;
+        string? dir = Path.GetDirectoryName(SelectedDownload.DestinationPath);
+        string name = SelectedDownload.FileName;
+        await AddDownloadDirectAsync(url, dir, name);
+    }
+
+    // Per-Item Actions
+    [RelayCommand]
+    public async Task ResumeItemAsync(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        await ResumeDownloadAsync();
+    }
+
+    [RelayCommand]
+    public async Task PauseItemAsync(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        await PauseDownloadAsync();
+    }
+
+    [RelayCommand]
+    public async Task CancelItemAsync(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        await CancelDownloadAsync();
+    }
+
+    [RelayCommand]
+    public async Task RemoveItemAsync(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        await RemoveDownloadAsync();
+    }
+
+    [RelayCommand]
+    public void OpenFileItem(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        OpenFile();
+    }
+
+    [RelayCommand]
+    public void OpenFolderItem(DownloadItemViewModel item)
+    {
+        if (item == null) return;
+        SelectedDownload = item;
+        OpenFolder();
     }
 
     [RelayCommand]
@@ -188,6 +426,7 @@ public partial class MainViewModel : ObservableObject
                 await _repository.DeleteJobAsync(item.Id);
                 Downloads.Remove(item);
             }
+            RefreshCounters();
             StatusMessage = $"Cleared {completed.Count} completed items from history";
         }
     }
@@ -252,6 +491,7 @@ public partial class MainViewModel : ObservableObject
         await _queueManager.RemoveJobAsync(id, deleteFiles);
         Downloads.Remove(SelectedDownload);
         SelectedDownload = null;
+        RefreshCounters();
         StatusMessage = $"Removed {name}";
     }
 
@@ -329,6 +569,7 @@ public partial class MainViewModel : ObservableObject
         {
             Downloads.Insert(0, vm);
             SelectedDownload = vm;
+            RefreshCounters();
         });
 
         if (startImmediately)
@@ -343,6 +584,8 @@ public partial class MainViewModel : ObservableObject
         {
             var item = Downloads.FirstOrDefault(d => d.Id == e.JobId);
             item?.UpdateProgress(e.DownloadedBytes, e.TotalBytes, e.SpeedBytesPerSecond, e.RemainingTime);
+            OnPropertyChanged(nameof(TotalSpeedFormatted));
+            OnPropertyChanged(nameof(TotalTransferredProgressFormatted));
         });
     }
 
@@ -354,6 +597,7 @@ public partial class MainViewModel : ObservableObject
             var item = Downloads.FirstOrDefault(d => d.Id == e.JobId);
             item?.UpdateStatus(e.NewStatus, e.ErrorMessage);
             FilteredDownloads.Refresh();
+            RefreshCounters();
 
             if (job != null)
             {
@@ -374,6 +618,7 @@ public partial class MainViewModel : ObservableObject
         Application.Current?.Dispatcher.Invoke(() =>
         {
             IsQueueRunning = _queueManager.IsRunning;
+            RefreshCounters();
             StatusMessage = IsQueueRunning ? $"Queue active ({_queueManager.ActiveDownloadsCount} running)" : "Queue paused";
         });
     }
@@ -398,53 +643,30 @@ public partial class MainViewModel : ObservableObject
 
                     await server.WaitForConnectionAsync(token);
 
-                    byte[] lenBytes = new byte[4];
-                    await server.ReadExactlyAsync(lenBytes, 0, 4, token);
-                    int payloadLen = BitConverter.ToInt32(lenBytes, 0);
+                    using var reader = new StreamReader(server, Encoding.UTF8);
+                    using var writer = new StreamWriter(server, Encoding.UTF8) { AutoFlush = true };
 
-                    if (payloadLen > 0 && payloadLen < 1024 * 1024)
+                    string? line = await reader.ReadLineAsync(token);
+                    if (!string.IsNullOrWhiteSpace(line))
                     {
-                        byte[] payload = new byte[payloadLen];
-                        await server.ReadExactlyAsync(payload, 0, payloadLen, token);
-                        string json = Encoding.UTF8.GetString(payload);
-
-                        using var doc = JsonDocument.Parse(json);
+                        var doc = JsonDocument.Parse(line);
                         var root = doc.RootElement;
-                        string? action = root.TryGetProperty("action", out var actProp) ? actProp.GetString() : null;
-                        string? url = root.TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
-                        string? filename = root.TryGetProperty("fileName", out var fnProp) ? fnProp.GetString() : null;
-                        string? referrer = root.TryGetProperty("referrer", out var refProp) ? refProp.GetString() : null;
-                        string? cookies = root.TryGetProperty("cookies", out var cProp) ? cProp.GetString() : null;
+                        string action = root.GetProperty("action").GetString() ?? "";
 
-                        if (string.Equals(action, "ping", StringComparison.OrdinalIgnoreCase))
+                        if (action == "download")
                         {
-                            string response = JsonSerializer.Serialize(new { status = "ok", message = "YDM UI is active" });
-                            byte[] respBytes = Encoding.UTF8.GetBytes(response);
-                            byte[] respLen = BitConverter.GetBytes(respBytes.Length);
+                            string url = root.GetProperty("url").GetString() ?? "";
+                            string? fileName = root.TryGetProperty("fileName", out var fn) ? fn.GetString() : null;
+                            string? referrer = root.TryGetProperty("referrer", out var rf) ? rf.GetString() : null;
+                            string? cookies = root.TryGetProperty("cookies", out var ck) ? ck.GetString() : null;
 
-                            await server.WriteAsync(respLen, token);
-                            await server.WriteAsync(respBytes, token);
-                            await server.FlushAsync(token);
-                        }
-                        else if (string.Equals(action, "download", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(url))
-                        {
-                            var settings = await _settingsRepository.GetSettingsAsync();
                             await AddDownloadDirectAsync(
                                 url: url, 
-                                destFolder: settings.DefaultDownloadDirectory, 
-                                customName: filename, 
-                                connections: settings.DefaultConnectionsPerDownload, 
-                                startImmediately: settings.AutoStartDownloads,
-                                referrer: referrer,
+                                customName: fileName, 
+                                referrer: referrer, 
                                 cookies: cookies);
 
-                            string response = JsonSerializer.Serialize(new { status = "accepted" });
-                            byte[] respBytes = Encoding.UTF8.GetBytes(response);
-                            byte[] respLen = BitConverter.GetBytes(respBytes.Length);
-
-                            await server.WriteAsync(respLen, token);
-                            await server.WriteAsync(respBytes, token);
-                            await server.FlushAsync(token);
+                            await writer.WriteLineAsync(JsonSerializer.Serialize(new { success = true }));
                         }
                     }
                 }
@@ -454,7 +676,7 @@ public partial class MainViewModel : ObservableObject
                 }
                 catch
                 {
-                    // Continue accepting next pipe connection
+                    await Task.Delay(500, token);
                 }
             }
         }, token);

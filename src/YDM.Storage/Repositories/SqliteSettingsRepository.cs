@@ -91,6 +91,12 @@ public class SqliteSettingsRepository : ISettingsRepository
         if (dict.TryGetValue("DuplicateFileAction", out var dupAct) && !string.IsNullOrWhiteSpace(dupAct))
             settings.DuplicateFileAction = dupAct;
 
+        if (dict.TryGetValue("ViewMode", out var vm) && !string.IsNullOrWhiteSpace(vm))
+            settings.ViewMode = vm;
+
+        if (dict.TryGetValue("ShowDetailsPanel", out var sdp) && bool.TryParse(sdp, out var sdpVal))
+            settings.ShowDetailsPanel = sdpVal;
+
         return settings;
     }
 
@@ -117,7 +123,9 @@ public class SqliteSettingsRepository : ISettingsRepository
             ["QueueScheduleStartTime"] = settings.QueueScheduleStartTime ?? string.Empty,
             ["QueueScheduleStopTime"] = settings.QueueScheduleStopTime ?? string.Empty,
             ["ConfirmFileDeletion"] = settings.ConfirmFileDeletion.ToString(),
-            ["DuplicateFileAction"] = settings.DuplicateFileAction
+            ["DuplicateFileAction"] = settings.DuplicateFileAction,
+            ["ViewMode"] = settings.ViewMode,
+            ["ShowDetailsPanel"] = settings.ShowDetailsPanel.ToString()
         };
 
         foreach (var kvp in dict)
